@@ -1,0 +1,37 @@
+#! /usr/bin/env python3
+
+DESCRIPTION = r'''Collate images into one PDF document.'''
+
+import argparse, os, subprocess
+
+def img2pdf(img_fn):
+    r'''
+    Converts a single image file to a single page PDF. The result is stored in a
+    temp file in the working dir, and the absolute filepath to that result is
+    returned.
+    '''
+    pdf_fn = 'tmp' + img_fn + '.pdf'
+    cmd = ['convert', '-density', '300', '-quality', '95', img_fn, pdf_fn]
+    print(' '.join(cmd))
+    subprocess.run(cmd)
+
+    return pdf_fn
+
+def collate(pdf_fns, out_fn):
+    r'''Combines all the PDF files in pdf_fns into one single out_fn PDF.'''
+    cmd = ['gs',
+        '-sDEVICE=pdfwrite', '-dNOPAUSE', '-dBATCH', '-dSAFER',
+        '-sOutputFile='+out_fn, *pdf_fns]
+    print(' '.join(cmd))
+    subprocess.run(cmd)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
+    parser.add_argument('imagefiles', nargs='+', help='list of images')
+    parser.add_argument('outputpdf', help='output filename')
+
+    args = parser.parse_args()
+
+    pdf_files = list(map(img2pdf, args.imagefiles))
+    collate(pdf_files, args.outputpdf)
+    list(map(lambda fn: os.remove(fn), pdf_files))  # list forces eval
