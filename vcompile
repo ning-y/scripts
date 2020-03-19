@@ -1,0 +1,94 @@
+#! /usr/bin/env python3
+
+import argparse, glob, os, re, shutil, subprocess, time
+
+DESCRIPTION = r'''Collate many videos from URLs into one.'''
+
+def get_urls(url):
+    r'''Reads URLs from get_urls and returns them in a list.'''
+    with open(url, 'r') as infile:
+        lines = infile.readlines()
+    lines = map(lambda s: s.strip(), lines)
+    lines = list(filter(lambda s: s != '', lines))
+    lines_unique = list(set(lines))
+
+    if len(lines) != len(lines_unique):
+        print('WARNING: duplicates found and removed:')
+        dups = filter(lambda i: lines[i] in lines[i+1:], range(len(lines)))
+        dups = map(lambda i: lines[i], dups)
+        dups = map(lambda url: '\t'+url, dups)
+        print('\n'.join(dups))
+
+    return lines_unique
+
+def download(url, dir):
+    r'''Downloads video to given dir'''
+    fn_template = os.path.join(dir, '%(title)s.%(ext)s')
+
+    cmd = ['youtube-dl', '--restrict-filenames', '-o', fn_template, url]
+    print(' '.join(cmd))
+    subprocess.run(cmd)
+
+
+def rescale(orig, dir, target):
+    r'''Rescales orig to target resolution, preserving aspect ratio.'''
+    cmd = ['ffprobe', orig]
+    print(' '.join(cmd))
+    current_res = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    current_res = re.search("(?<=, )\d{3,4}x\d{3,4}", current_res.decode()).group(0).strip()
+    current_res = tuple(map(int, current_res.split('x')))
+
+    # setsar, otherwise the concat downstream won't work.
+    ffmpeg_filter = (
+        f"[0:v]scale={target[0]}:{target[1]}:force_original_aspect_ratio=decrease,"
+        f"pad={target[0]}:{target[1]}:(ow-iw)/2:(oh-ih)/2,setsar=1[v]")
+
+    # -map 0:1 preconditions that audio stream in orig is 0:1
+    # https://superuser.com/questions/940169/
+    outfn = os.path.join(dir, os.path.split(orig)[-1]) + '.mp4'
+    cmd = ['ffmpeg', '-i', orig, '-filter_complex', ffmpeg_filter,
+        '-map', '[v]', '-map', '0:a', outfn]
+    print(' '.join(cmd))
+    subprocess.run(cmd)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
+    parser.add_argument('urls', help='txt file containing URLs')
+    parser.add_argument('out', help='output video file')
+
+    args = parser.parse_args()
+
+    # Download
+    temp_dir1 = 'temp' + str(int(time.time()))
+    os.mkdir(temp_dir1)
+    urls = get_urls(args.urls)
+    list(map(lambda url: download(url, temp_dir1), urls))
+
+    # Rescale
+    temp_dir2 = 'temp' + str(int(time.time()))
+    os.mkdir(temp_dir2)
+    files = glob.glob(temp_dir1 + '/*')
+    list(map(lambda fn: rescale(fn, temp_dir2, (720, 1280)), files))
+
+    # Concat
+    temp_out = 'temp' + str(int(time.time())) + '.mp4'
+    infiles = glob.glob(temp_dir2 + '/*')
+    infiles = [ elem for pair in zip(['-i']*(len(infiles)+1), infiles)
+        for elem in pair ]
+    filter_left = [ f"[{i}:v] [{i}:a]" for i in range(len(infiles)//2) ]
+    filter_right = f" concat=n={len(infiles)//2}:v=1:a=1 [v] [a]"
+    filter_str = ' '.join(filter_left) + filter_right
+    cmd = ['ffmpeg'] + infiles + ['-filter_complex', filter_str,
+        '-map', '[v]', '-map', '[a]', temp_out]
+    print(' '.join(cmd))
+    subprocess.run(cmd)
+
+    # Normalize audio
+    cmd = ['ffmpeg-normalize', '-c:a', 'aac', temp_out, '-o', args.out]
+    print(' '.join(cmd))
+    subprocess.run(cmd)
+
+    shutil.rmtree(temp_dir1)
+    shutil.rmtree(temp_dir2)
+    os.remove(temp_out)
