@@ -80,7 +80,7 @@ if __name__ == '__main__':
     filter_right = f" concat=n={len(infiles)//2}:v=1:a=1 [v] [a]"
     filter_str = ' '.join(filter_left) + filter_right
     cmd = ['ffmpeg'] + infiles + ['-filter_complex', filter_str,
-        '-map', '[v]', '-map', '[a]', temp_out]
+        '-map', '[v]', '-map', '[a]', '-async', '1', '-vsync', '1', temp_out]
     print(' '.join(cmd))
     subprocess.run(cmd)
 
