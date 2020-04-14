@@ -2,7 +2,10 @@
 
 import argparse, glob, os, re, shutil, subprocess, time
 
+THIS_DIR = os.path.dirname(os.path.realpath(__file__))  # resolves symlinks!
 DESCRIPTION = r'''Collate many videos from URLs into one.'''
+FONTFILE = os.path.join(THIS_DIR, 'fonts/Amiko-SemiBold.ttf')
+FONTSIZE = 30
 
 def get_urls(url):
     r'''Reads URLs from get_urls and returns them in a list.'''
@@ -21,6 +24,7 @@ def get_urls(url):
 
     return lines_unique
 
+
 def download(url, dir):
     r'''Downloads video to given dir'''
     fn_template = os.path.join(dir, '%(title)s.%(ext)s')
@@ -31,7 +35,10 @@ def download(url, dir):
 
 
 def rescale(orig, dir, target):
-    r'''Rescales orig to target resolution, preserving aspect ratio.'''
+    r'''
+    Rescales orig to target resolution, preserving aspect ratio. Writes to the
+    dir given in the arguments.
+    '''
     cmd = ['ffprobe', orig]
     print(' '.join(cmd))
     current_res = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
@@ -52,10 +59,38 @@ def rescale(orig, dir, target):
     subprocess.run(cmd)
 
 
+def make_footer(txtfp, outfn):
+    r'''
+    Appends text given in the txtfp text file to the video orig, writing to
+    outfn. Duration is hard-coded to 10 seconds. Target resolution is hard-coded
+    to 720 x 1280.
+    '''
+    target_res = (720, 1280)
+
+    temp_out = 'temp' + str(int(time.time())) + '.mp4'
+    cmd = [
+        'ffmpeg', '-f', 'lavfi', '-i',
+        'color=c=black:s={}x{}:d=10'.format(*target_res), '-vf',
+        (
+            'drawtext=fontfile={}:fontsize={}:fontcolor=white:x=(w-text_w)/2:'
+            'y=(h-text_h)/2:textfile={}'
+        ).format(FONTFILE, FONTSIZE, txtfp), temp_out]
+    print(' '.join(cmd))
+    subprocess.run(cmd)
+
+    cmd = [
+        'ffmpeg', '-i', temp_out, '-f', 'lavfi', '-i', 'anullsrc',
+        '-c:v', 'copy', '-c:a', 'aac', '-shortest', outfn]
+    print(' '.join(cmd))
+    subprocess.run(cmd)
+    os.remove(temp_out)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('urls', help='txt file containing URLs')
     parser.add_argument('out', help='output video file')
+    parser.add_argument('--footer', help='footer text file')
 
     args = parser.parse_args()
 
@@ -76,6 +111,11 @@ if __name__ == '__main__':
     infiles = glob.glob(temp_dir2 + '/*')
     infiles = [ elem for pair in zip(['-i']*(len(infiles)+1), infiles)
         for elem in pair ]
+    # Consider footer
+    if args.footer is not None:
+        footer_temp_out = 'footer' + str(int(time.time())) + '.mp4'
+        make_footer(args.footer, footer_temp_out)
+        infiles.extend(['-i', footer_temp_out])
     filter_left = [ f"[{i}:v] [{i}:a]" for i in range(len(infiles)//2) ]
     filter_right = f" concat=n={len(infiles)//2}:v=1:a=1 [v] [a]"
     filter_str = ' '.join(filter_left) + filter_right
@@ -92,3 +132,4 @@ if __name__ == '__main__':
     shutil.rmtree(temp_dir1)
     shutil.rmtree(temp_dir2)
     os.remove(temp_out)
+    if args.footer is not None: os.remove(footer_temp_out)
