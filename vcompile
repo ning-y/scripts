@@ -125,7 +125,7 @@ if __name__ == '__main__':
     subprocess.run(cmd)
 
     # Normalize audio
-    cmd = ['ffmpeg-normalize', '-c:a', 'aac', temp_out, '-o', args.out]
+    cmd = ['ffmpeg-normalize', '-f', '-c:a', 'aac', temp_out, '-o', args.out]
     print(' '.join(cmd))
     subprocess.run(cmd)
 
@@ -133,3 +133,11 @@ if __name__ == '__main__':
     shutil.rmtree(temp_dir2)
     os.remove(temp_out)
     if args.footer is not None: os.remove(footer_temp_out)
+
+    # Print the duration
+    cmd = ['ffprobe', args.out]
+    print(' '.join(cmd))
+    ffprobe_output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    ffprobe_duration = filter(
+        lambda s: 'Duration' in s, ffprobe_output.decode().split('\n'))
+    print(list(ffprobe_duration)[0])
