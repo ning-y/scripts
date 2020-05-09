@@ -11,8 +11,9 @@ def get_urls(url):
     r'''Reads URLs from get_urls and returns them in a list.'''
     with open(url, 'r') as infile:
         lines = infile.readlines()
-    lines = map(lambda s: s.strip(), lines)
-    lines = list(filter(lambda s: s != '', lines))
+    lines = map(lambda s: s[:s.find('#')], lines)  # remove comments
+    lines = map(lambda s: s.strip(), lines)  # strip start/end whitespaces
+    lines = list(filter(lambda s: s != '', lines))  # remove empty lines
     lines_unique = list(set(lines))
 
     if len(lines) != len(lines_unique):
