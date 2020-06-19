@@ -1,0 +1,5 @@
+#! /usr/bin/env bash
+
+find -name "$1" | while read file; do
+  awk -v DIR=$(dirname "$file") '{print DIR"/" $0}' "$file"
+done

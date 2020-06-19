@@ -3,3 +3,6 @@
 - **vcompile**: Combines many videos from youtube-dl compatible URLs into one
   video. Requires ffmpeg, and ffmpeg-normalize. ffmpeg must have been compiled
   with `--enable-libfreetype`.
+- **cigs**: Collect .gitignore style files in the current directory, given a
+  filename. Outputs each line of each .ignore file prepended with the
+  appropriate relative paths.
