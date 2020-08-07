@@ -6,3 +6,5 @@
 - **cigs**: Collect .gitignore style files in the current directory, given a
   filename. Outputs each line of each .ignore file prepended with the
   appropriate relative paths.
+- **cited**: Prints the cite keys of a given bibfile which are not used in the
+  given text file.
