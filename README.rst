@@ -14,3 +14,5 @@ cited
     file.
 sc
     Screenshots to the clipboard.
+nap
+    Sleep until a given ISO 8601 datetime string.

@@ -1,0 +1,16 @@
+#! /usr/bin/env python3
+
+import argparse, datetime, time
+
+parser = argparse.ArgumentParser(
+    description="Wait until a ISO8 601 date time.")
+parser.add_argument(
+    "datetime_string", help="ISO 8601 datetime string e.g. 2020-08-27T21:36:00")
+args = parser.parse_args()
+
+seconds_to_sleep = (
+    datetime.datetime.fromisoformat(args.datetime_string) -
+    datetime.datetime.now())
+print(f"Waiting for {seconds_to_sleep}...")
+time.sleep(seconds_to_sleep.total_seconds())
+print(f"Done waiting! Time now is {args.datetime_string}.")
